@@ -17,11 +17,11 @@ func main() {
 		//Logger:    g.NewLogger(log.New(os.Stdout, "", 0)),
 	}
 
-	tablel1 := make(map[string]string)
-	tablel1["ifIndex"] = ".1.3.6.1.2.1.2.2.1.1."
-	tablel1["ifDescription"] = "1.3.6.1.2.1.2.2.1.2."
-	tablel1["OutputStatus"] = "1.3.6.1.2.1.2.2.1.8."
-	tablel1["AdminStatus"] = "1.3.6.1.2.1.2.2.1.7."
+	table1 := make(map[string]string)
+	table1["ifIndex"] = ".1.3.6.1.2.1.2.2.1.1."
+	table1["ifDescription"] = "1.3.6.1.2.1.2.2.1.2."
+	table1["OutputStatus"] = "1.3.6.1.2.1.2.2.1.8."
+	table1["AdminStatus"] = "1.3.6.1.2.1.2.2.1.7."
 	table2 := make(map[string]string)
 	table2["column1"] = "1.3.6.1.2.1.4.20.1.2."
 	table2["column2"] = "1.3.6.1.2.1.4.20.1.3."
@@ -32,28 +32,13 @@ func main() {
 	//defer profile.Start().Stop()
 	c := make(chan []interface{}, 1)
 	for i := 0; i < 3; i++ {
-		go SnmpValue(params, tablel1, walkId, c)
+		go SnmpValue(params, table1, walkId, c)
 		go SnmpValue(params, table2, "1.3.6.1.2.1.4.20.1.1", c)
 	}
 	for i := 0; i < 6; i++ {
 		fmt.Println(<-c)
 		fmt.Println("...................")
 	}
-
-	/*count := 0
-	for buffer := range c {
-
-		count++
-
-		fmt.Println(buffer)
-
-		if count == 1 {
-			close(c)
-			break
-		}
-
-	}*/
-
 	end := time.Now()
 	fmt.Println(end.Sub(start))
 
@@ -64,24 +49,24 @@ func SnmpValue(params g.GoSNMP, table map[string]string, walkId string, c chan [
 	if err1 != nil {
 		fmt.Println("Unable to connect")
 	}
-	var walkoidarray []string
+	var walkOidArray []string
 	walkIdResult := params.Walk(walkId, func(pdu g.SnmpPDU) error {
 		switch pdu.Type {
 		case g.IPAddress:
 			result := pdu.Value
-			walkoidarray = append(walkoidarray, result.(string))
+			walkOidArray = append(walkOidArray, result.(string))
 			break
 		case g.Integer:
 			result := g.ToBigInt(pdu.Value)
-			walkoidarray = append(walkoidarray, result.String())
+			walkOidArray = append(walkOidArray, result.String())
 			break
 		case g.OctetString:
 			result := pdu.Value.([]byte)
-			walkoidarray = append(walkoidarray, string(result))
+			walkOidArray = append(walkOidArray, string(result))
 			break
 		default:
 			result := pdu.Value
-			walkoidarray = append(walkoidarray, result.(string))
+			walkOidArray = append(walkOidArray, result.(string))
 		}
 		return nil
 	},
@@ -95,12 +80,12 @@ func SnmpValue(params g.GoSNMP, table map[string]string, walkId string, c chan [
 	for key := range table {
 		oidDescriptionArray = append(oidDescriptionArray, key)
 	}
-	var listofoid []string
+	var listOfOids []string
 
 	var resultArray []interface{}
-	for i := 0; i < len(walkoidarray); i++ {
+	for i := 0; i < len(walkOidArray); i++ {
 		for oid := range oidDescriptionArray {
-			listofoid = append(listofoid, table[oidDescriptionArray[oid]]+walkoidarray[i])
+			listOfOids = append(listOfOids, table[oidDescriptionArray[oid]]+walkOidArray[i])
 		}
 	}
 
@@ -108,9 +93,9 @@ func SnmpValue(params g.GoSNMP, table map[string]string, walkId string, c chan [
 	var endIndex = 40
 
 	for {
-		var result, error = params.Get(listofoid[startIndex:endIndex])
-		if error != nil {
-			fmt.Println(error)
+		var result, err = params.Get(listOfOids[startIndex:endIndex])
+		if err != nil {
+			fmt.Println(err)
 		}
 		for _, variable := range result.Variables {
 			resultArray = append(resultArray, SnmpData(variable))
@@ -118,15 +103,14 @@ func SnmpValue(params g.GoSNMP, table map[string]string, walkId string, c chan [
 		startIndex = endIndex + 1
 		endIndex = endIndex + 60
 
-		if endIndex > len(listofoid) {
-			endIndex = len(listofoid)
+		if endIndex > len(listOfOids) {
+			endIndex = len(listOfOids)
 		}
-		if startIndex == len(listofoid)+1 {
+		if startIndex == len(listOfOids)+1 {
 			break
 		}
 	}
-	//fmt.Println(resultArray)
-	c <- (resultArray)
+	c <- resultArray
 
 }
 
@@ -138,38 +122,13 @@ func SnmpData(pdu g.SnmpPDU) interface{} {
 	switch pdu.Type {
 	case g.IPAddress:
 		return pdu.Value
-		break
 	case g.Integer:
 		return g.ToBigInt(pdu.Value)
-		break
 
 	case g.OctetString:
 		return string(pdu.Value.([]byte))
-		break
 	default:
 		return pdu.Value
 	}
-	return pdu.Value
-
+	
 }
-
-/*func WalkFunction(pdu g.SnmpPDU) error {
-	switch pdu.Type {
-	case g.IPAddress:
-		result := pdu.Value
-		walkoidarray = append(walkoidarray, result.(string))
-		break
-	case g.Integer:
-		result := g.ToBigInt(pdu.Value)
-		walkoidarray = append(walkoidarray, result.String())
-		break
-	case g.OctetString:
-		result := pdu.Value.([]byte)
-		walkoidarray = append(walkoidarray, string(result))
-		break
-	default:
-		result := pdu.Value
-		walkoidarray = append(walkoidarray, result.(string))
-	}
-	return nil
-}*/
